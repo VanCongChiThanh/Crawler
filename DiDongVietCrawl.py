@@ -76,7 +76,9 @@ def main():
     # URL của các trang web
     url = {
         # "didongviet": "https://didongviet.vn/dien-thoai-iphone.html",
-        "clickbuy": "https://clickbuy.com.vn/dien-thoai-iphone-cu",
+        # "clickbuy": "https://clickbuy.com.vn/dien-thoai-iphone-cu",
+        # "taozinsaigon":"https://taozinsaigon.com/iphone"
+        "minhtuanmobile": "https://minhtuanmobile.com/iphone-cu/",
     }
 
     # Các CSS selector tùy chỉnh theo trang web
@@ -87,12 +89,24 @@ def main():
         #     "link_selector": "a.max-md\\:min-w-\\[185px\\]",
         #     "image_selector": "img.max-h-full"
         # },
-        "clickbuy": {
-            "name_selector": "h3.title_name",
-            "price_selector": "ins.new-price",
-            "link_selector": "a[aria-label]",  # Trỏ đến thẻ <a> có aria-label
-            "image_selector": "img.lazyload"
-        },
+        # "clickbuy": {
+        #     "name_selector": "h3.title_name",
+        #     "price_selector": "ins.new-price",
+        #     "link_selector": "a[aria-label]",  # Trỏ đến thẻ <a> có aria-label
+        #     "image_selector": "img.lazyload"
+        # },
+    #              "taozinsaigon": {
+    # "name_selector": ".pinfo h3 a",
+    # "price_selector": ".price",
+    # "link_selector": ".boxItem .pic a",  # Cập nhật lại để phù hợp với cấu trúc
+    # "image_selector": ".boxItem .pic img"
+    #              }
+               "minhtuanmobile": {
+        "name_selector": "h3.probox__title",
+        "price_selector": "b.price",
+        "link_selector": "a.box",
+        "image_selector": "div.probox__img figure img"
+         },
 
     }
 
