@@ -108,17 +108,18 @@ def normalize_product_name(product_name):
     # Chuyển tên sản phẩm về chữ thường
     normalized_name = product_name.lower()
     
-    # Chỉ lấy phần chuỗi trước chữ "gb"
-    if "gb" in normalized_name:
-        normalized_name = normalized_name.split("gb", 1)[0]
+    # Chỉ lấy phần chuỗi trước chữ "b" đầu tiên
+    if "b" in normalized_name:
+        normalized_name = normalized_name.split("b", 1)[0] + "b"  # Giữ lại cả chữ "b"
     
-    # Loại bỏ khoảng trắng
-    normalized_name = normalized_name.replace(" ", "")
+    # Loại bỏ khoảng trắng ở đầu và cuối, giữ lại khoảng trắng ở giữa
+    normalized_name = normalized_name.strip()
     
     return normalized_name
 
+
 def add_or_update_product(product_name, category_id, image_url, website_id, price, product_url):
-    # Chuyển tên sản phẩm về chữ thường và loại bỏ khoảng trắng
+    # Chuyển tên sản phẩm về chữ thường và chỉ lấy phần trước "GB"
     normalized_product_name = normalize_product_name(product_name)
     
     # Kết nối đến cơ sở dữ liệu
@@ -126,15 +127,16 @@ def add_or_update_product(product_name, category_id, image_url, website_id, pric
     cursor = conn.cursor()
     
     try:
-        # Tìm kiếm sản phẩm theo tên (so sánh không phân biệt chữ hoa, thường và bỏ khoảng trắng)
+        # Tìm kiếm sản phẩm đã tồn tại dựa trên tên chuẩn hóa
         product_query = """
             SELECT id FROM Products 
-            WHERE LOWER(REPLACE(name, ' ', '')) LIKE ?;
+            WHERE LOWER(name) LIKE ?;
         """
         cursor.execute(product_query, ('%' + normalized_product_name + '%',))
         product = cursor.fetchone()
         
         if product:
+            print(f"Sản phẩm đã tồn tại: {normalized_product_name}")
             product_id = product[0]
             # Kiểm tra xem giá của sản phẩm trên website này đã tồn tại chưa
             price_query = """
@@ -145,36 +147,37 @@ def add_or_update_product(product_name, category_id, image_url, website_id, pric
             price_record = cursor.fetchone()
             
             if price_record:
-                # Nếu giá đã tồn tại, cập nhật giá mới
+                # Cập nhật giá nếu đã tồn tại
                 update_price_query = """
                     UPDATE ProductPrices 
                     SET price = ? 
                     WHERE id = ?;
                 """
-                cursor.execute(update_price_query, (price if price is not None else 0, price_record[0]))  # Thay thế None bằng 0
+                cursor.execute(update_price_query, (price if price is not None else 0, price_record[0]))
             else:
-                # Nếu giá chưa tồn tại, chèn giá mới
+                # Chèn mới nếu giá chưa tồn tại
                 insert_price_query = """
                     INSERT INTO ProductPrices (product_id, website_id, price, url) 
                     VALUES (?, ?, ?, ?);
                 """
-                cursor.execute(insert_price_query, (product_id, website_id, price if price is not None else 0, product_url))  # Thay thế None bằng 0
+                cursor.execute(insert_price_query, (product_id, website_id, price if price is not None else 0, product_url))
         else:
-            # Nếu sản phẩm chưa tồn tại, tạo sản phẩm mới
+            print(f"Normalized product name: {normalized_product_name}")
+            # Nếu sản phẩm chưa tồn tại, tạo sản phẩm mới và chỉ lưu phần trước "GB"
             insert_product_query = """
                 INSERT INTO Products (name, image_url, category_id) 
                 OUTPUT INSERTED.id
                 VALUES (?, ?, ?);
             """
-            cursor.execute(insert_product_query, (product_name, image_url, category_id))
+            cursor.execute(insert_product_query, (normalized_product_name, image_url, category_id))
             product_id = cursor.fetchone()[0]
             
-            # Chèn giá cho sản phẩm mới
+            # Sau đó chèn giá
             insert_price_query = """
                 INSERT INTO ProductPrices (product_id, website_id, price, url) 
                 VALUES (?, ?, ?, ?);
             """
-            cursor.execute(insert_price_query, (product_id, website_id, price if price is not None else 0, product_url))  # Thay thế None bằng 0
+            cursor.execute(insert_price_query, (product_id, website_id, price if price is not None else 0, product_url))
         
         # Lưu các thay đổi
         conn.commit()
@@ -211,7 +214,7 @@ def main():
             "link_selector": "a[aria-label]",  
             "image_selector": "img.lazyload"
         },
-               "minhtuanmobile": {
+        "minhtuanmobile": {
         "name_selector": "h3.probox__title",
         "price_selector": "b.price",
         "link_selector": "a.box",
