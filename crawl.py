@@ -10,7 +10,7 @@ import re
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app) 
+CORS(app)
 
 # Hàm khởi tạo trình duyệt
 def init_driver():
@@ -30,7 +30,6 @@ def load_all_products(driver, url, site_name):
     
     while True:
         try:
-            # Tìm nút "Xem thêm" bằng văn bản
             load_more_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Xem thêm')] | //a[contains(., 'Xem thêm')]"))
             )
@@ -64,10 +63,10 @@ def get_product_info(driver, name_selector, price_selector, link_selector, image
             image_url = product.find_element(By.CSS_SELECTOR, image_selector).get_attribute('src')
 
             products_data.append({
-                'Tên sản phẩm': name,
-                'Giá sản phẩm': price,
-                'Link sản phẩm': link,
-                'URL ảnh sản phẩm': image_url
+                'product_name': name,
+                'product_price': price,
+                'product_link': link,
+                'product_image': image_url
             })
         except Exception as e:
             print(f"Lỗi khi lấy dữ liệu sản phẩm: {e}")
@@ -107,6 +106,7 @@ def normalize_product_name(product_name):
     normalized_name = normalized_name.strip()
     return normalized_name
 
+# Hàm thêm hoặc cập nhật sản phẩm vào cơ sở dữ liệu
 def add_or_update_product(product_name, category_id, image_url, website_id, price, product_url):
     normalized_product_name = normalize_product_name(product_name)
     conn = pyodbc.connect(conn_str)
@@ -164,9 +164,9 @@ def add_or_update_product(product_name, category_id, image_url, website_id, pric
         cursor.close()
         conn.close()
 
+# API crawl sản phẩm từ các trang web, trả về JSON
 @app.route('/crawl', methods=['POST'])
 def crawl():
-    # Lấy thông tin từ JSON request
     data = request.get_json()
 
     site_name = data.get('site_name')
@@ -174,15 +174,13 @@ def crawl():
     category_id = data.get('category_id')
     selectors = data.get('selectors')
 
-    results = {}
     driver = init_driver()
+    products_data = []
     try:
         print(f"Đang lấy dữ liệu từ {site_name}...")
-        
-        # Mở trang web và click vào nút "Xem thêm" nếu có
+
         load_all_products(driver, url, site_name)
-        
-        # Lấy thông tin sản phẩm từ trang web
+
         products_data = get_product_info(
             driver,
             name_selector=selectors['name_selector'],
@@ -190,36 +188,39 @@ def crawl():
             link_selector=selectors['link_selector'],
             image_selector=selectors['image_selector']
         )
-        
-        # Lưu thông tin vào DataFrame và file CSV
-        results[site_name] = {
-            'count': len(products_data),
-            'status': 'success'
-        }
-        save_to_dataframe(products_data, "products_" + site_name)
-        
-        # Lưu dữ liệu vào cơ sở dữ liệu
-        for product in products_data:
-            product_name = product['Tên sản phẩm']
-            product_price = clean_price(product['Giá sản phẩm'])
-            product_link = product['Link sản phẩm']
-            product_image = product['URL ảnh sản phẩm']
-            
-            add_or_update_product(
-                product_name=product_name,
-                category_id=category_id,
-                image_url=product_image,
-                website_id=site_id_mapping(site_name),
-                price=product_price,
-                product_url=product_link
-            )
     except Exception as e:
-        results['error'] = str(e)
+        return jsonify({'error': str(e)})
     finally:
         driver.quit()
-    
-    return jsonify(results)
 
+    return jsonify(products_data)
+
+# API thêm sản phẩm vào cơ sở dữ liệu hàng loạt
+@app.route('/add_products', methods=['POST'])
+def add_products():
+    data = request.get_json()
+    products = data.get('products')
+    category_id = data.get('category_id')
+    site_name = data.get('site_name')
+
+    website_id = site_id_mapping(site_name)
+    
+    for product in products:
+        product_name = product['product_name']
+        product_price = clean_price(product['product_price'])
+        product_link = product['product_link']
+        product_image = product['product_image']
+        
+        add_or_update_product(
+            product_name=product_name,
+            category_id=category_id,
+            image_url=product_image,
+            website_id=website_id,
+            price=product_price,
+            product_url=product_link
+        )
+    
+    return jsonify({'status': 'success', 'message': 'Products added successfully'})
 
 if __name__ == "__main__":
-     app.run(port=5000, debug=True)
+    app.run(port=5000, debug=True)
